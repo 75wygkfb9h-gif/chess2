@@ -1,0 +1,1022 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>شطرنج الملوك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@500;700&display=swap">
+<style>
+/* Layout: full-bleed 3D board with a slim HUD on top (turn, actions) and a move list docked left on desktop, bottom on phones. One committed dark look: charcoal room, ivory and obsidian pieces, brass accents. */
+:root {
+  --bg: #0c0e11;
+  --panel: rgba(18, 21, 26, .82);
+  --card: #171a20;
+  --line: rgba(255, 255, 255, .12);
+  --fg: #f2ede3;
+  --mute: #a09a8c;
+  --gold: #e0ac4a;
+  --gold-ink: #1d1403;
+  --danger: #ff7a6b;
+  --display: 'Reem Kufi', 'Cairo', system-ui, sans-serif;
+  --body: 'Cairo', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; overflow: hidden; }
+h1, h2, p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+.app { position: relative; height: 100%; direction: rtl; overflow: hidden; }
+#view { position: absolute; inset: 0; touch-action: none; background: radial-gradient(ellipse 85% 75% at 50% 42%, #2b3039 0%, #15181d 58%, #0a0b0e 100%); }
+#view canvas { display: block; width: 100%; height: 100%; outline: none; }
+		
+.hud {
+  position: absolute; inset: 0 0 auto 0; pointer-events: none;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding-block: 12px 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.hud > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.crest { width: 38px; height: 38px; border-radius: 12px; background: var(--gold); color: var(--gold-ink); display: grid; place-items: center; font-size: 24px; line-height: 1; }
+.brand h1 { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.1; }
+.turn { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 18px 6px 14px; font-weight: 700; backdrop-filter: blur(8px); min-width: 0; }
+.turn .dotc { width: 16px; height: 16px; border-radius: 50%; flex: none; border: 2px solid var(--gold); background: #f3ead8; }
+.turn[data-side="b"] .dotc { background: #1b1615; }
+.turn.alert { border-color: var(--danger); color: var(--danger); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 5px 14px; font-weight: 600; font-size: 14px; backdrop-filter: blur(8px); }
+.btn:hover:not(:disabled) { border-color: var(--gold); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.btn.warn { background: var(--danger); color: #230804; border-color: var(--danger); }
+.btn.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+
+.moves {
+  position: absolute; top: 96px; width: 210px; max-height: calc(100% - 120px);
+  left: max(16px, env(safe-area-inset-left, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px; backdrop-filter: blur(8px);
+}
+.moves h2 { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--gold); }
+#movelist { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 2px; min-height: 0; }
+#movelist li { display: grid; grid-template-columns: 28px 1fr 1fr; gap: 4px; font-variant-numeric: tabular-nums; font-size: 14px; direction: ltr; text-align: left; }
+#movelist .n { color: var(--mute); }
+#movelist .empty { display: block; color: var(--mute); direction: rtl; text-align: right; }
+#movelist .m:last-of-type { }
+#movelist li.cur .m.last { color: var(--gold); font-weight: 700; }
+
+.modal { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 6, 8, .6); padding: 16px; z-index: 5; }
+.dialog { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px; max-width: 400px; width: 100%; text-align: center; display: grid; gap: 14px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7); }
+.dialog h2 { font-family: var(--display); font-size: 30px; line-height: 1.2; color: var(--gold); text-wrap: balance; }
+.dialog p { color: var(--mute); }
+.dialog .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.dialog .btn { padding: 8px 20px; font-size: 15px; }
+.promo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.promo button { aspect-ratio: 1; border-radius: 14px; border: 1px solid var(--line); background: #0f1216; font-size: 46px; line-height: 1; display: grid; place-items: center; font-variant-emoji: text; }
+.promo button:hover { border-color: var(--gold); }
+.promo[data-side="w"] button { color: #f6edd9; }
+.promo[data-side="b"] button { color: #6d6a66; }
+.promo[data-side="b"] button { background: #cfc7b8; color: #1b1615; }
+#fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; z-index: 6; background: var(--bg); }
+
+@media (max-width: 760px) {
+  .brand h1 { font-size: 20px; }
+  .crest { width: 32px; height: 32px; font-size: 20px; }
+  .btn { padding: 4px 10px; font-size: 13px; }
+  .moves { top: auto; bottom: 12px; width: auto; right: max(16px, env(safe-area-inset-right, 0px)); max-height: 112px; padding: 8px 12px; }
+  .moves h2 { display: none; }
+  #movelist { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 92px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="app" id="app" lang="ar">
+  <div id="view"></div>
+
+  <header class="hud">
+    <div class="brand">
+      <span class="crest" aria-hidden="true">&#9822;&#xFE0E;</span>
+      <h1>شطرنج الملوك</h1>
+    </div>
+    <div class="turn" id="turn" data-side="w" role="status" aria-live="polite">
+      <i class="dotc"></i><span id="turnText">دور الأبيض</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="bUndo" type="button">تراجع</button>
+      <button class="btn" id="bFlip" type="button">اقلب الكاميرا</button>
+      <button class="btn" id="bAuto" type="button" aria-pressed="false">لفّ مع الدور</button>
+      <button class="btn" id="bSound" type="button" aria-pressed="true">الصوت</button>
+      <button class="btn" id="bDraw" type="button">تعادل</button>
+      <button class="btn" id="bResign" type="button">استسلام</button>
+      <button class="btn" id="bNew" type="button">لعبة جديدة</button>
+    </div>
+  </header>
+
+  <aside class="moves" aria-label="النقلات">
+    <h2>النقلات</h2>
+    <ol id="movelist"></ol>
+  </aside>
+
+  <div class="modal" id="promo" hidden>
+    <div class="dialog">
+      <h2>ترقية الجندي</h2>
+      <p>اختار القطعة اللي عاوزها.</p>
+      <div class="promo" id="promoBtns" data-side="w"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="over" hidden>
+    <div class="dialog">
+      <h2 id="overTitle"></h2>
+      <p id="overText"></p>
+      <div class="row">
+        <button class="btn primary" id="overNew" type="button">لعبة جديدة</button>
+        <button class="btn" id="overClose" type="button">راجع اللوحة</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="fail" hidden>
+    <div class="dialog">
+      <h2>مش قادر أشغّل الـ3D</h2>
+      <p>المتصفح ده مش دعّام WebGL. جرّب متصفح تاني أو فعّل تسريع الهاردوير.</p>
+    </div>
+  </div>
+</div>
+
+<script id="engine">
+/* محرك قواعد الشطرنج: sq = rank*8 + file، و rank 0 هو صف الأبيض الأول. */
+const Engine = (function () {
+  'use strict';
+  const FILES = 'abcdefgh';
+  const isW = function (p) { return p === p.toUpperCase(); };
+  const sqName = function (s) { return FILES[s & 7] + ((s >> 3) + 1); };
+  const N_OFF = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
+  const K_OFF = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const B_DIR = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const R_DIR = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  function startState() {
+    const b = Array(64).fill(null);
+    const back = 'RNBQKBNR';
+    for (let f = 0; f < 8; f++) {
+      b[f] = back[f]; b[8 + f] = 'P'; b[48 + f] = 'p'; b[56 + f] = back[f].toLowerCase();
+    }
+    return { b: b, turn: 'w', castle: { K: true, Q: true, k: true, q: true }, ep: -1, half: 0, full: 1 };
+  }
+
+  function fromFEN(fen) {
+    const parts = fen.split(' ');
+    const b = Array(64).fill(null);
+    parts[0].split('/').forEach(function (row, i) {
+      const r = 7 - i; let f = 0;
+      for (const ch of row) { if (/\d/.test(ch)) f += +ch; else b[r * 8 + f++] = ch; }
+    });
+    const cs = parts[2] || '-', ep = parts[3] || '-';
+    return {
+      b: b, turn: parts[1], castle: { K: cs.indexOf('K') > -1, Q: cs.indexOf('Q') > -1, k: cs.indexOf('k') > -1, q: cs.indexOf('q') > -1 },
+      ep: ep !== '-' ? (ep.charCodeAt(0) - 97) + (+ep[1] - 1) * 8 : -1, half: 0, full: 1
+    };
+  }
+
+  function ray(b, f, r, dirs, types) {
+    for (const d of dirs) {
+      let nf = f + d[0], nr = r + d[1];
+      while (nf >= 0 && nf < 8 && nr >= 0 && nr < 8) {
+        const p = b[nr * 8 + nf];
+        if (p) { if (types.indexOf(p) > -1) return true; break; }
+        nf += d[0]; nr += d[1];
+      }
+    }
+    return false;
+  }
+
+  function attacked(b, sq, byWhite) {
+    const f = sq & 7, r = sq >> 3;
+    const pr = byWhite ? r - 1 : r + 1;
+    if (pr >= 0 && pr < 8) {
+      for (const df of [-1, 1]) {
+        const pf = f + df;
+        if (pf >= 0 && pf < 8 && b[pr * 8 + pf] === (byWhite ? 'P' : 'p')) return true;
+      }
+    }
+    const kn = byWhite ? 'N' : 'n', kg = byWhite ? 'K' : 'k';
+    for (const o of N_OFF) {
+      const nf = f + o[0], nr = r + o[1];
+      if (nf >= 0 && nf < 8 && nr >= 0 && nr < 8 && b[nr * 8 + nf] === kn) return true;
+    }
+    for (const o of K_OFF) {
+      const nf = f + o[0], nr = r + o[1];
+      if (nf >= 0 && nf < 8 && nr >= 0 && nr < 8 && b[nr * 8 + nf] === kg) return true;
+    }
+    if (ray(b, f, r, B_DIR, byWhite ? ['B', 'Q'] : ['b', 'q'])) return true;
+    if (ray(b, f, r, R_DIR, byWhite ? ['R', 'Q'] : ['r', 'q'])) return true;
+    return false;
+  }
+
+  function gen(s) {
+    const b = s.b, white = s.turn === 'w', out = [];
+    const add = function (from, to, p, cap, promo, flag) {
+      out.push({ from: from, to: to, piece: p, cap: cap || null, promo: promo || null, flag: flag || null });
+    };
+    for (let sq = 0; sq < 64; sq++) {
+      const p = b[sq];
+      if (!p || isW(p) !== white) continue;
+      const t = p.toUpperCase(), f = sq & 7, r = sq >> 3;
+      if (t === 'P') {
+        const dir = white ? 1 : -1, startR = white ? 1 : 6, promoR = white ? 7 : 0;
+        const one = sq + dir * 8, last = (r + dir) === promoR;
+        if (!b[one]) {
+          if (last) { for (const pr of 'QRBN') add(sq, one, p, null, pr); }
+          else {
+            add(sq, one, p);
+            if (r === startR && !b[sq + dir * 16]) add(sq, sq + dir * 16, p, null, null, 'double');
+          }
+        }
+        for (const df of [-1, 1]) {
+          const nf = f + df;
+          if (nf < 0 || nf > 7) continue;
+          const to = (r + dir) * 8 + nf, tg = b[to];
+          if (tg && isW(tg) !== white) {
+            if (last) { for (const pr of 'QRBN') add(sq, to, p, tg, pr); }
+            else add(sq, to, p, tg);
+          } else if (!tg && to === s.ep) {
+            add(sq, to, p, white ? 'p' : 'P', null, 'ep');
+          }
+        }
+      } else if (t === 'N' || t === 'K') {
+        const offs = t === 'N' ? N_OFF : K_OFF;
+        for (const o of offs) {
+          const nf = f + o[0], nr = r + o[1];
+          if (nf < 0 || nf > 7 || nr < 0 || nr > 7) continue;
+          const to = nr * 8 + nf, tg = b[to];
+          if (!tg || isW(tg) !== white) add(sq, to, p, tg);
+        }
+        if (t === 'K') {
+          const base = white ? 0 : 56, rook = white ? 'R' : 'r';
+          if (sq === base + 4 && !attacked(b, sq, !white)) {
+            if ((white ? s.castle.K : s.castle.k) && b[base + 7] === rook && !b[base + 5] && !b[base + 6] &&
+              !attacked(b, base + 5, !white) && !attacked(b, base + 6, !white)) add(sq, base + 6, p, null, null, 'castleK');
+            if ((white ? s.castle.Q : s.castle.q) && b[base] === rook && !b[base + 1] && !b[base + 2] && !b[base + 3] &&
+              !attacked(b, base + 3, !white) && !attacked(b, base + 2, !white)) add(sq, base + 2, p, null, null, 'castleQ');
+          }
+        }
+      } else {
+        const dirs = t === 'B' ? B_DIR : t === 'R' ? R_DIR : B_DIR.concat(R_DIR);
+        for (const d of dirs) {
+          let nf = f + d[0], nr = r + d[1];
+          while (nf >= 0 && nf < 8 && nr >= 0 && nr < 8) {
+            const to = nr * 8 + nf, tg = b[to];
+            if (!tg) add(sq, to, p);
+            else { if (isW(tg) !== white) add(sq, to, p, tg); break; }
+            nf += d[0]; nr += d[1];
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  function apply(s, m) {
+    const b = s.b.slice(), p = b[m.from], white = isW(p);
+    b[m.from] = null;
+    if (m.flag === 'ep') b[m.to + (white ? -8 : 8)] = null;
+    b[m.to] = m.promo ? (white ? m.promo : m.promo.toLowerCase()) : p;
+    if (m.flag === 'castleK') { b[m.from + 3] = null; b[m.from + 1] = white ? 'R' : 'r'; }
+    if (m.flag === 'castleQ') { b[m.from - 4] = null; b[m.from - 1] = white ? 'R' : 'r'; }
+    const c = { K: s.castle.K, Q: s.castle.Q, k: s.castle.k, q: s.castle.q };
+    if (p === 'K') { c.K = false; c.Q = false; }
+    if (p === 'k') { c.k = false; c.q = false; }
+    if (m.from === 0 || m.to === 0) c.Q = false;
+    if (m.from === 7 || m.to === 7) c.K = false;
+    if (m.from === 56 || m.to === 56) c.q = false;
+    if (m.from === 63 || m.to === 63) c.k = false;
+    return {
+      b: b, turn: white ? 'b' : 'w', castle: c,
+      ep: m.flag === 'double' ? (m.from + m.to) / 2 : -1,
+      half: (p.toUpperCase() === 'P' || m.cap) ? 0 : s.half + 1,
+      full: s.full + (white ? 0 : 1)
+    };
+  }
+
+  function inCheck(s, color) {
+    const white = (color || s.turn) === 'w';
+    return attacked(s.b, s.b.indexOf(white ? 'K' : 'k'), !white);
+  }
+
+  function legal(s) {
+    const white = s.turn === 'w', out = [];
+    for (const m of gen(s)) {
+      const ns = apply(s, m);
+      if (!attacked(ns.b, ns.b.indexOf(white ? 'K' : 'k'), !white)) out.push(m);
+    }
+    return out;
+  }
+
+  function insufficient(s) {
+    const ps = [];
+    for (let i = 0; i < 64; i++) {
+      const p = s.b[i];
+      if (p && p.toUpperCase() !== 'K') ps.push([p.toUpperCase(), i]);
+    }
+    if (!ps.length) return true;
+    if (ps.length === 1 && (ps[0][0] === 'N' || ps[0][0] === 'B')) return true;
+    if (ps.every(function (x) { return x[0] === 'B'; })) {
+      const c = ps.map(function (x) { return ((x[1] & 7) + (x[1] >> 3)) % 2; });
+      if (c.every(function (v) { return v === c[0]; })) return true;
+    }
+    return false;
+  }
+
+  function key(s) {
+    return s.b.map(function (p) { return p || '.'; }).join('') + s.turn +
+      (s.castle.K ? 'K' : '') + (s.castle.Q ? 'Q' : '') + (s.castle.k ? 'k' : '') + (s.castle.q ? 'q' : '') + s.ep;
+  }
+
+  function san(s, m, legalList) {
+    const p = s.b[m.from], t = p.toUpperCase();
+    let out;
+    if (m.flag === 'castleK') out = 'O-O';
+    else if (m.flag === 'castleQ') out = 'O-O-O';
+    else {
+      const to = sqName(m.to);
+      if (t === 'P') {
+        out = (m.cap ? FILES[m.from & 7] + 'x' : '') + to + (m.promo ? '=' + m.promo : '');
+      } else {
+        let dis = '';
+        const others = legalList.filter(function (o) { return o !== m && s.b[o.from] === p && o.to === m.to; });
+        if (others.length) {
+          const sameFile = others.some(function (o) { return (o.from & 7) === (m.from & 7); });
+          const sameRank = others.some(function (o) { return (o.from >> 3) === (m.from >> 3); });
+          if (!sameFile) dis = FILES[m.from & 7];
+          else if (!sameRank) dis = String((m.from >> 3) + 1);
+          else dis = sqName(m.from);
+        }
+        out = t + dis + (m.cap ? 'x' : '') + to;
+      }
+    }
+    const ns = apply(s, m);
+    if (inCheck(ns)) out += legal(ns).length ? '+' : '#';
+    return out;
+  }
+
+  return { startState: startState, fromFEN: fromFEN, legal: legal, apply: apply, inCheck: inCheck,
+    insufficient: insufficient, key: key, san: san, sqName: sqName, isW: isW };
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script id="game">
+(function () {
+  'use strict';
+  var E = Engine;
+  function $(id) { return document.getElementById(id); }
+
+  if (!window.THREE || !THREE.OrbitControls) { $('fail').hidden = false; return; }
+
+  /* ---------- renderer / scene ---------- */
+  var view = $('view'), renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  } catch (err) { $('fail').hidden = false; return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  view.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enablePan = false;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.7;
+  controls.minDistance = 7;
+  controls.maxDistance = 34;
+  controls.minPolarAngle = 0.15;
+  controls.maxPolarAngle = 1.38;
+  controls.target.set(0, 0.2, 0);
+  var userMoved = false;
+  controls.addEventListener('start', function () { userMoved = true; });
+
+  function fitCamera() {
+    var w = view.clientWidth || 800, h = view.clientHeight || 600, a = w / h;
+    renderer.setSize(w, h, false);
+    camera.aspect = a; camera.updateProjectionMatrix();
+    if (userMoved) return;
+    var portrait = a < 1;
+    var half = portrait ? 5.2 : 6.6;
+    var dist = Math.max(13, half / (Math.tan(THREE.MathUtils.degToRad(20)) * Math.min(a, 1.6)));
+    var el = THREE.MathUtils.degToRad(portrait ? 62 : 52);
+    camera.position.set(0, Math.sin(el) * dist + 0.2, Math.cos(el) * dist);
+    controls.update();
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitCamera).observe(view);
+  window.addEventListener('resize', fitCamera);
+  fitCamera();
+
+  /* ---------- environment for reflections ---------- */
+  (function () {
+    var pm = new THREE.PMREMGenerator(renderer);
+    var es = new THREE.Scene();
+    var geo = new THREE.SphereGeometry(30, 32, 16), cols = [], pos = geo.attributes.position;
+    for (var i = 0; i < pos.count; i++) {
+      var t = (pos.getY(i) / 30 + 1) / 2;
+      cols.push(0.04 + t * 0.5, 0.045 + t * 0.48, 0.05 + t * 0.46);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true })));
+    function panel(w, h, p, k) {
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(k, k * 0.95, k * 0.86), side: THREE.DoubleSide }));
+      m.position.copy(p); m.lookAt(0, 0, 0); es.add(m);
+    }
+    panel(14, 7, new THREE.Vector3(-10, 11, 8), 7);
+    panel(10, 5, new THREE.Vector3(12, 7, -6), 3.5);
+    panel(8, 8, new THREE.Vector3(0, 16, 0), 4);
+    scene.environment = pm.fromScene(es, 0.04).texture;
+    pm.dispose();
+  })();
+
+  /* ---------- lights ---------- */
+  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x15110d, 0.45));
+  var sun = new THREE.DirectionalLight(0xfff0dc, 1.5);
+  sun.position.set(-6, 13, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -8; sun.shadow.camera.right = 8;
+  sun.shadow.camera.top = 8; sun.shadow.camera.bottom = -8;
+  sun.shadow.camera.near = 2; sun.shadow.camera.far = 32;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  scene.add(sun);
+  var rim = new THREE.DirectionalLight(0x9db8ff, 0.35);
+  rim.position.set(8, 6, -9);
+  scene.add(rim);
+
+  /* ---------- procedural textures ---------- */
+  function rnd() { return Math.random(); }
+  function marble(base, vein, dots) {
+    var c = document.createElement('canvas'); c.width = c.height = 256;
+    var g = c.getContext('2d');
+    g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+    for (var i = 0; i < 380; i++) {
+      g.fillStyle = (rnd() < 0.5 ? 'rgba(255,255,255,' : 'rgba(0,0,0,') + (rnd() * dots) + ')';
+      g.beginPath(); g.arc(rnd() * 256, rnd() * 256, 4 + rnd() * 30, 0, 6.2832); g.fill();
+    }
+    g.strokeStyle = vein;
+    for (var v = 0; v < 8; v++) {
+      g.globalAlpha = 0.1 + rnd() * 0.22; g.lineWidth = 0.5 + rnd() * 1.6;
+      g.beginPath(); var x = rnd() * 256, y = 0; g.moveTo(x, y);
+      for (var k = 0; k < 6; k++) {
+        x += (rnd() - 0.5) * 80; y += 256 / 6;
+        g.quadraticCurveTo(x + (rnd() - 0.5) * 50, y - 20, x, y);
+      }
+      g.stroke();
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+    return t;
+  }
+  function wood() {
+    var c = document.createElement('canvas'); c.width = 256; c.height = 256;
+    var g = c.getContext('2d');
+    g.fillStyle = '#4a2f1d'; g.fillRect(0, 0, 256, 256);
+    for (var i = 0; i < 90; i++) {
+      g.strokeStyle = 'rgba(' + (rnd() < 0.5 ? '20,10,4,' : '120,76,44,') + (0.08 + rnd() * 0.2) + ')';
+      g.lineWidth = 0.6 + rnd() * 2.2;
+      g.beginPath(); var y = rnd() * 256; g.moveTo(0, y);
+      g.bezierCurveTo(80, y + (rnd() - 0.5) * 16, 170, y + (rnd() - 0.5) * 16, 256, y + (rnd() - 0.5) * 10);
+      g.stroke();
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+    return t;
+  }
+
+  /* ---------- board ---------- */
+  var lightTex = marble('#e8dcc4', '#8c7a5c', 0.05);
+  var darkTex = marble('#35524b', '#9fc2b4', 0.06);
+  var lightMat = new THREE.MeshStandardMaterial({ map: lightTex, roughness: 0.28, metalness: 0, envMapIntensity: 0.45 });
+  var darkMat = new THREE.MeshStandardMaterial({ map: darkTex, roughness: 0.25, metalness: 0.05, envMapIntensity: 0.55 });
+  var woodTex = wood();
+  var woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.45, metalness: 0, envMapIntensity: 0.5 });
+  var goldMat = new THREE.MeshStandardMaterial({ color: 0xd9a441, metalness: 1, roughness: 0.26, envMapIntensity: 1.3 });
+
+  var board = new THREE.Group(); scene.add(board);
+  var squareMeshes = [];
+  var sqGeo = new THREE.BoxGeometry(1, 0.2, 1);
+  for (var sq = 0; sq < 64; sq++) {
+    var f = sq & 7, r = sq >> 3;
+    var dark = (f + r) % 2 === 0;
+    var mesh = new THREE.Mesh(sqGeo, dark ? darkMat : lightMat);
+    mesh.position.set(f - 3.5, -0.1, 3.5 - r);
+    mesh.rotation.y = Math.floor(rnd() * 4) * Math.PI / 2;
+    mesh.receiveShadow = true;
+    mesh.userData.sq = sq;
+    board.add(mesh); squareMeshes.push(mesh);
+  }
+  function box(w, h, d, mat, x, y, z) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; board.add(m); return m;
+  }
+  box(9.1, 0.4, 0.55, woodMat, 0, -0.12, 4.275);
+  box(9.1, 0.4, 0.55, woodMat, 0, -0.12, -4.275);
+  box(0.55, 0.4, 8, woodMat, 4.275, -0.12, 0);
+  box(0.55, 0.4, 8, woodMat, -4.275, -0.12, 0);
+  box(9.5, 0.25, 9.5, woodMat, 0, -0.45, 0);
+  box(8.08, 0.02, 0.04, goldMat, 0, 0.085, 4.02);
+  box(8.08, 0.02, 0.04, goldMat, 0, 0.085, -4.02);
+  box(0.04, 0.02, 8.0, goldMat, 4.02, 0.085, 0);
+  box(0.04, 0.02, 8.0, goldMat, -4.02, 0.085, 0);
+
+  function label(txt, x, z) {
+    var c = document.createElement('canvas'); c.width = c.height = 64;
+    var g = c.getContext('2d');
+    g.fillStyle = '#e0ac4a'; g.font = '700 40px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(txt, 32, 34);
+    var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.09, z); board.add(m);
+  }
+  for (var i = 0; i < 8; i++) {
+    label('abcdefgh'[i], i - 3.5, 4.29);
+    label(String(i + 1), -4.29, 3.5 - i);
+  }
+  var shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.5 }));
+  shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.position.y = -0.58; shadowPlane.receiveShadow = true;
+  scene.add(shadowPlane);
+
+  /* ---------- pieces ---------- */
+  var matW = new THREE.MeshPhysicalMaterial({ color: 0xf3ead8, roughness: 0.32, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.25, envMapIntensity: 0.9 });
+  var matB = new THREE.MeshPhysicalMaterial({ color: 0x241d1a, roughness: 0.28, metalness: 0.15, clearcoat: 0.9, clearcoatRoughness: 0.2, envMapIntensity: 1.15 });
+  var eyeW = new THREE.MeshStandardMaterial({ color: 0x1a1412, roughness: 0.3 });
+  var eyeB = new THREE.MeshStandardMaterial({ color: 0xe0ac4a, metalness: 0.8, roughness: 0.3 });
+
+  function lathe(pts) {
+    var v = pts.map(function (p) { return new THREE.Vector2(p[0], p[1]); });
+    var s = new THREE.SplineCurve(v).getPoints(pts.length * 4)
+      .map(function (p) { return new THREE.Vector2(Math.max(0, p.x), p.y); });
+    return new THREE.LatheGeometry(s, 56);
+  }
+  var BASE = [[0, 0], [0.38, 0], [0.42, 0.025], [0.42, 0.07], [0.37, 0.11], [0.33, 0.14]];
+  var PROFILES = {
+    P: BASE.concat([[0.24, 0.19], [0.16, 0.32], [0.135, 0.42], [0.2, 0.455], [0.2, 0.485], [0.13, 0.51], [0.2, 0.56], [0.215, 0.64], [0.17, 0.73], [0.09, 0.78], [0, 0.795]]),
+    R: BASE.concat([[0.28, 0.2], [0.23, 0.34], [0.22, 0.55], [0.27, 0.62], [0.3, 0.65], [0.33, 0.68], [0.34, 0.7], [0.34, 0.78], [0.3, 0.78], [0.15, 0.78], [0, 0.78]]),
+    B: BASE.concat([[0.26, 0.2], [0.18, 0.3], [0.12, 0.45], [0.14, 0.52], [0.24, 0.56], [0.24, 0.6], [0.13, 0.64], [0.16, 0.72], [0.22, 0.82], [0.22, 0.92], [0.16, 1.03], [0.08, 1.1], [0.05, 1.14], [0, 1.15]]),
+    Q: BASE.concat([[0.28, 0.2], [0.2, 0.35], [0.14, 0.55], [0.13, 0.75], [0.18, 0.82], [0.2, 0.86], [0.13, 0.9], [0.12, 0.98], [0.2, 1.08], [0.27, 1.2], [0.29, 1.26], [0.2, 1.26], [0.17, 1.22], [0, 1.22]]),
+    K: BASE.concat([[0.3, 0.2], [0.22, 0.35], [0.15, 0.55], [0.14, 0.8], [0.2, 0.87], [0.22, 0.92], [0.14, 0.97], [0.13, 1.05], [0.22, 1.12], [0.28, 1.2], [0.27, 1.28], [0.2, 1.3], [0, 1.3]]),
+    N: BASE.concat([[0.3, 0.2], [0.28, 0.24], [0.26, 0.26], [0.1, 0.26], [0, 0.26]])
+  };
+  var geos = {};
+  Object.keys(PROFILES).forEach(function (k) { geos[k] = lathe(PROFILES[k]); });
+
+  var horseGeo = (function () {
+    var pts = [[-0.26, 0.22], [-0.13, 0.2], [0, 0.2], [0.13, 0.2], [0.26, 0.22], [0.22, 0.3], [0.16, 0.42], [0.12, 0.52],
+      [0.2, 0.56], [0.3, 0.52], [0.4, 0.54], [0.43, 0.6], [0.4, 0.7], [0.32, 0.86], [0.22, 1.0], [0.17, 1.1], [0.1, 1.08],
+      [0.02, 1.16], [0, 1.06], [-0.1, 0.98], [-0.2, 0.82], [-0.27, 0.62], [-0.3, 0.4]]
+      .map(function (p) { return new THREE.Vector3(p[0], p[1], 0); });
+    var curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+    var shape = new THREE.Shape(curve.getPoints(140).map(function (p) { return new THREE.Vector2(p.x, p.y); }));
+    var g = new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 5, curveSegments: 12 });
+    g.translate(0, 0, -0.11);
+    return g;
+  })();
+  var ringGeo = new THREE.TorusGeometry(0.335, 0.02, 12, 56);
+  var ballGeo = new THREE.SphereGeometry(1, 24, 16);
+
+  function buildProto(t, color) {
+    var g = new THREE.Group(), mat = color === 'w' ? matW : matB;
+    function add(geo, m, x, y, z, parent) {
+      var me = new THREE.Mesh(geo, m || mat);
+      me.position.set(x || 0, y || 0, z || 0);
+      me.castShadow = true; me.receiveShadow = true;
+      (parent || g).add(me); return me;
+    }
+    function ball(r, m, x, y, z, parent) { var b = add(ballGeo, m, x, y, z, parent); b.scale.setScalar(r); return b; }
+    add(geos[t]);
+    add(ringGeo, goldMat, 0, 0.15, 0).rotation.x = Math.PI / 2;
+    var i, a;
+    if (t === 'R') {
+      for (i = 0; i < 6; i++) {
+        a = i * Math.PI / 3;
+        var mer = add(new THREE.BoxGeometry(0.09, 0.15, 0.17), mat, Math.cos(a) * 0.285, 0.85, Math.sin(a) * 0.285);
+        mer.rotation.y = -a;
+      }
+    } else if (t === 'B') {
+      ball(0.06, goldMat, 0, 1.19, 0);
+    } else if (t === 'Q') {
+      for (i = 0; i < 8; i++) {
+        a = i * Math.PI / 4;
+        ball(0.05, mat, Math.cos(a) * 0.27, 1.28, Math.sin(a) * 0.27);
+      }
+      ball(0.075, goldMat, 0, 1.31, 0);
+    } else if (t === 'K') {
+      add(new THREE.BoxGeometry(0.09, 0.34, 0.09), goldMat, 0, 1.47, 0);
+      add(new THREE.BoxGeometry(0.27, 0.085, 0.09), goldMat, 0, 1.52, 0);
+    } else if (t === 'N') {
+      var head = new THREE.Group();
+      add(horseGeo, mat, 0, 0, 0, head);
+      var em = color === 'w' ? eyeW : eyeB;
+      ball(0.032, em, 0.21, 0.83, 0.175, head);
+      ball(0.032, em, 0.21, 0.83, -0.175, head);
+      head.rotation.y = color === 'w' ? Math.PI / 2 : -Math.PI / 2;
+      g.add(head);
+    }
+    return g;
+  }
+  var protos = {};
+  'PNBRQK'.split('').forEach(function (t) { protos[t + 'w'] = buildProto(t, 'w'); protos[t + 'b'] = buildProto(t, 'b'); });
+
+  function makePiece(t, color) {
+    var p = protos[t + color].clone();
+    p.userData = { sq: -1, type: t, color: color };
+    return p;
+  }
+  function sqPos(sq) { return new THREE.Vector3((sq & 7) - 3.5, 0, 3.5 - (sq >> 3)); }
+  function trayPos(color, i) {
+    var side = color === 'w' ? -1 : 1;
+    return new THREE.Vector3(side * (5.5 + (i % 2) * 0.62), 0, 3.3 - Math.floor(i / 2) * 0.62);
+  }
+
+  /* ---------- highlights ---------- */
+  var hl = new THREE.Group(); scene.add(hl);
+  var planeGeo = new THREE.PlaneGeometry(0.98, 0.98);
+  var dotGeo = new THREE.CircleGeometry(0.17, 32);
+  var capGeo = new THREE.RingGeometry(0.36, 0.47, 40);
+  function hmat(c, o) { return new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false }); }
+  var selMat = hmat(0xe0ac4a, 0.55), lastMat = hmat(0xe0ac4a, 0.26), dotMat = hmat(0xfff2c9, 0.9), capMat = hmat(0xff6b5e, 0.95), chkMat = hmat(0xff3b30, 0.6);
+
+  /* ---------- state ---------- */
+  var state, history, keys, over, selected, legal, inChk, lastMove, busy, pendingPromo, autoFlip = false, muted = false;
+  var pieces = new Map(), trayMeshes = [];
+
+  function evaluate() {
+    legal = E.legal(state);
+    inChk = E.inCheck(state);
+    over = over && (over.type === 'resign' || over.type === 'agreed') ? over : null;
+    if (over) return;
+    if (!legal.length) over = inChk ? { type: 'mate', winner: state.turn === 'w' ? 'b' : 'w' } : { type: 'stalemate' };
+    else if (state.half >= 100) over = { type: 'fifty' };
+    else if (E.insufficient(state)) over = { type: 'insufficient' };
+    else {
+      var k = keys[keys.length - 1], n = 0;
+      for (var i = 0; i < keys.length; i++) if (keys[i] === k) n++;
+      if (n >= 3) over = { type: 'repeat' };
+    }
+  }
+
+  function clearScene() {
+    pieces.forEach(function (m) { scene.remove(m); });
+    trayMeshes.forEach(function (m) { scene.remove(m); });
+    pieces.clear(); trayMeshes = [];
+    tweens.length = 0;
+  }
+  function capturesOf(color) {
+    return history.filter(function (h) { return h.cap && (E.isW(h.cap) ? 'w' : 'b') === color; });
+  }
+  function syncPieces() {
+    clearScene();
+    for (var sq = 0; sq < 64; sq++) {
+      var p = state.b[sq]; if (!p) continue;
+      var m = makePiece(p.toUpperCase(), E.isW(p) ? 'w' : 'b');
+      m.position.copy(sqPos(sq)); m.userData.sq = sq;
+      scene.add(m); pieces.set(sq, m);
+    }
+    ['w', 'b'].forEach(function (c) {
+      capturesOf(c).forEach(function (h, i) {
+        var m = makePiece(h.cap.toUpperCase(), c);
+        m.position.copy(trayPos(c, i)); m.scale.setScalar(0.55);
+        scene.add(m); trayMeshes.push(m);
+      });
+    });
+  }
+
+  /* ---------- tweens ---------- */
+  var tweens = [];
+  function tween(o) { o.t = -(o.delay || 0); tweens.push(o); }
+  function updateTweens(dt) {
+    for (var i = tweens.length - 1; i >= 0; i--) {
+      var w = tweens[i]; w.t += dt;
+      if (w.t < 0) continue;
+      var k = Math.min(1, w.t / w.dur);
+      var e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      w.obj.position.lerpVectors(w.from, w.to, e);
+      w.obj.position.y += (w.hop || 0) * Math.sin(Math.PI * k);
+      if (w.scale != null) w.obj.scale.setScalar(1 + (w.scale - 1) * e);
+      if (k >= 1) { tweens.splice(i, 1); if (w.done) w.done(); }
+    }
+  }
+  function isTweening(m) { return tweens.some(function (w) { return w.obj === m; }); }
+
+  function animateMove(m, cb) {
+    var mover = pieces.get(m.from); pieces.delete(m.from);
+    var white = E.isW(m.piece), color = white ? 'w' : 'b';
+    var n = 0;
+    function fin() { if (--n === 0) cb(); }
+    function go(obj, to, o) {
+      n++;
+      tween({ obj: obj, from: obj.position.clone(), to: to, dur: o.dur, hop: o.hop, delay: o.delay, scale: o.scale,
+        done: function () { if (o.after) o.after(); fin(); } });
+    }
+    if (m.cap) {
+      var capSq = m.flag === 'ep' ? m.to + (white ? -8 : 8) : m.to;
+      var cm = pieces.get(capSq); pieces.delete(capSq);
+      var idx = capturesOf(white ? 'b' : 'w').length - 1;
+      var ccolor = white ? 'b' : 'w';
+      go(cm, trayPos(ccolor, idx), { dur: 0.8, hop: 1.4, delay: 0.3, scale: 0.55, after: function () { trayMeshes.push(cm); thump(120, 0.12, 0.25); } });
+    }
+    if (m.flag === 'castleK' || m.flag === 'castleQ') {
+      var rf = m.flag === 'castleK' ? m.from + 3 : m.from - 4, rt = m.flag === 'castleK' ? m.from + 1 : m.from - 1;
+      var rm = pieces.get(rf); pieces.delete(rf);
+      go(rm, sqPos(rt), { dur: 0.55, hop: 0.3, delay: 0.1, after: function () { rm.userData.sq = rt; pieces.set(rt, rm); } });
+    }
+    var isN = m.piece.toUpperCase() === 'N';
+    go(mover, sqPos(m.to), { dur: 0.5, hop: isN ? 0.7 : 0.25, after: function () {
+      var final = mover;
+      if (m.promo) {
+        scene.remove(mover);
+        final = makePiece(m.promo, color);
+        final.position.copy(sqPos(m.to)); scene.add(final);
+        thump(520, 0.18, 0.15);
+      }
+      final.userData.sq = m.to; pieces.set(m.to, final);
+      thump(200, 0.1, 0.35);
+    } });
+  }
+
+  /* ---------- sound ---------- */
+  var actx = null;
+  function audio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+    return actx;
+  }
+  function thump(freq, dur, gain) {
+    if (muted) return;
+    var a = audio(); if (!a) return;
+    try {
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, a.currentTime);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.5, a.currentTime + dur);
+      g.gain.setValueAtTime(gain, a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(); o.stop(a.currentTime + dur);
+    } catch (e) {}
+  }
+
+  /* ---------- UI ---------- */
+  var NAME = { w: 'الأبيض', b: 'الأسود' };
+  function drawHL() {
+    while (hl.children.length) hl.remove(hl.children[0]);
+    function put(geo, mat, sq, y) {
+      var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2;
+      var p = sqPos(sq); m.position.set(p.x, y, p.z); hl.add(m);
+    }
+    if (lastMove) { put(planeGeo, lastMat, lastMove.from, 0.01); put(planeGeo, lastMat, lastMove.to, 0.01); }
+    if (inChk) put(planeGeo, chkMat, state.b.indexOf(state.turn === 'w' ? 'K' : 'k'), 0.012);
+    if (selected != null) {
+      put(planeGeo, selMat, selected, 0.014);
+      var seen = {};
+      legal.forEach(function (m) {
+        if (m.from !== selected || seen[m.to]) return;
+        seen[m.to] = true;
+        if (m.cap) put(capGeo, capMat, m.to, 0.02); else put(dotGeo, dotMat, m.to, 0.02);
+      });
+    }
+  }
+  var RESULT = {
+    mate: function (o) { return ['كش مات!', 'الـ' + NAME[o.winner] + ' كسب بعد ' + Math.ceil(history.length / 2) + ' نقلة.']; },
+    stalemate: function () { return ['تعادل', 'ستالميت: صاحب الدور مفيش قدامه نقلة وملوش كش.']; },
+    fifty: function () { return ['تعادل', 'عدّت 50 نقلة من غير أسر أو تحريك جندي.']; },
+    insufficient: function () { return ['تعادل', 'مفيش قطع كفاية لحد فيكم يعمل كش مات.']; },
+    repeat: function () { return ['تعادل', 'الوضع اتكرر 3 مرات.']; },
+    resign: function (o) { return ['استسلام', 'استسلم الـ' + NAME[o.loser] + '، والـ' + NAME[o.winner] + ' كسب.']; },
+    agreed: function () { return ['تعادل', 'اتفقتوا على التعادل.']; }
+  };
+  var overShown = false;
+  function renderUI() {
+    var turn = $('turn');
+    turn.dataset.side = state.turn;
+    turn.classList.toggle('alert', !!inChk && !over);
+    if (over) {
+      turn.classList.remove('alert');
+      $('turnText').textContent = RESULT[over.type](over)[0];
+    } else {
+      $('turnText').textContent = 'دور ' + NAME[state.turn] + (inChk ? ' · كش!' : '');
+    }
+    var items = '';
+    for (var i = 0; i < history.length; i += 2) {
+      var lastRow = i + 2 >= history.length;
+      items += '<li' + (lastRow ? ' class="cur"' : '') + '><span class="n">' + (i / 2 + 1) + '</span><span class="m' +
+        (lastRow && !history[i + 1] ? ' last' : '') + '">' + history[i].san + '</span><span class="m' +
+        (lastRow && history[i + 1] ? ' last' : '') + '">' + (history[i + 1] ? history[i + 1].san : '') + '</span></li>';
+    }
+    var ml = $('movelist');
+    ml.innerHTML = items || '<li class="empty">لسه محدش لعب.</li>';
+    ml.scrollTop = ml.scrollHeight;
+    $('bUndo').disabled = !history.length || busy;
+    $('bDraw').disabled = !!over || busy;
+    $('bResign').disabled = !!over || busy;
+    drawHL();
+    if (over && !overShown) {
+      overShown = true;
+      var r = RESULT[over.type](over);
+      $('overTitle').textContent = r[0]; $('overText').textContent = r[1];
+      setTimeout(function () { if (over) $('over').hidden = false; }, 600);
+    }
+  }
+  function refresh() { evaluate(); renderUI(); }
+
+  function newGame() {
+    state = E.startState(); history = []; keys = [E.key(state)];
+    over = null; overShown = false; selected = null; lastMove = null; busy = false; pendingPromo = null;
+    $('over').hidden = true; $('promo').hidden = true;
+    syncPieces(); refresh();
+    if (autoFlip) alignCamera();
+  }
+
+  function doMove(m) {
+    busy = true;
+    var lifted = pieces.get(selected);
+    if (lifted) lifted.position.y = 0;
+    selected = null;
+    var s = E.san(state, m, legal);
+    history.push({ m: m, san: s, before: state, cap: m.cap });
+    state = E.apply(state, m);
+    keys.push(E.key(state));
+    lastMove = m;
+    drawHL();
+    animateMove(m, function () {
+      busy = false;
+      refresh();
+      if (inChk && !over) { thump(660, 0.15, 0.2); setTimeout(function () { thump(880, 0.2, 0.18); }, 150); }
+      if (autoFlip) alignCamera();
+    });
+    renderUI();
+  }
+
+  function select(sq) {
+    var prev = pieces.get(selected);
+    if (prev && !isTweening(prev)) prev.position.y = 0;
+    selected = sq;
+    drawHL();
+  }
+
+  function onSquare(sq) {
+    if (busy || over || pendingPromo) return;
+    var p = state.b[sq];
+    if (p && E.isW(p) === (state.turn === 'w')) { select(sq === selected ? null : sq); return; }
+    if (selected != null) {
+      var c = legal.filter(function (m) { return m.from === selected && m.to === sq; });
+      if (c.length) {
+        if (c[0].promo) askPromo(c); else doMove(c[0]);
+        return;
+      }
+    }
+    select(null);
+  }
+
+  function askPromo(cands) {
+    pendingPromo = cands;
+    var white = state.turn === 'w';
+    var glyph = { Q: '♛', R: '♜', B: '♝', N: '♞' };
+    var box = $('promoBtns'); box.dataset.side = state.turn;
+    box.innerHTML = ['Q', 'R', 'B', 'N'].map(function (t) {
+      return '<button type="button" data-p="' + t + '" aria-label="' + t + '">' + glyph[t] + '︎</button>';
+    }).join('');
+    $('promo').hidden = false;
+  }
+  $('promoBtns').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !pendingPromo) return;
+    var m = pendingPromo.filter(function (x) { return x.promo === b.dataset.p; })[0];
+    pendingPromo = null; $('promo').hidden = true;
+    if (m) doMove(m);
+  });
+
+  /* ---------- picking ---------- */
+  var ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  function pick(ev) {
+    var r = renderer.domElement.getBoundingClientRect();
+    mouse.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    var objs = []; pieces.forEach(function (m) { objs.push(m); });
+    var hits = ray.intersectObjects(objs.concat(squareMeshes), true);
+    for (var i = 0; i < hits.length; i++) {
+      var o = hits[i].object;
+      while (o && o.userData.sq === undefined) o = o.parent;
+      if (o && o.userData.sq >= 0) return o.userData.sq;
+    }
+    return null;
+  }
+  var down = null, dom = renderer.domElement;
+  dom.addEventListener('pointerdown', function (e) {
+    down = { x: e.clientX, y: e.clientY };
+    var a = audio(); if (a && a.state === 'suspended') a.resume();
+  });
+  dom.addEventListener('pointerup', function (e) {
+    if (!down) return;
+    var moved = Math.hypot(e.clientX - down.x, e.clientY - down.y); down = null;
+    if (moved > 6) return;
+    var sq = pick(e);
+    if (sq != null) onSquare(sq);
+  });
+  var hoverQueued = false;
+  dom.addEventListener('pointermove', function (e) {
+    if (e.pointerType !== 'mouse' || e.buttons || hoverQueued) return;
+    hoverQueued = true;
+    requestAnimationFrame(function () {
+      hoverQueued = false;
+      var sq = pick(e), cur = 'default';
+      if (sq != null && !busy && !over) {
+        var p = state.b[sq];
+        if (p && E.isW(p) === (state.turn === 'w')) cur = 'pointer';
+        else if (selected != null && legal.some(function (m) { return m.from === selected && m.to === sq; })) cur = 'pointer';
+      }
+      dom.style.cursor = cur;
+    });
+  });
+
+  /* ---------- camera ---------- */
+  var camBusy = false;
+  function rotateCamera(delta) {
+    if (camBusy) return;
+    camBusy = true; userMoved = true;
+    var t0 = performance.now(), last = 0, dur = 900, up = new THREE.Vector3(0, 1, 0);
+    (function step(now) {
+      var k = Math.min(1, (now - t0) / dur);
+      var e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      camera.position.sub(controls.target).applyAxisAngle(up, (e - last) * delta).add(controls.target);
+      last = e; controls.update();
+      if (k < 1) requestAnimationFrame(step); else camBusy = false;
+    })(t0);
+  }
+  function alignCamera() {
+    var wantWhite = state.turn === 'w', fromWhite = camera.position.z > 0;
+    if (wantWhite !== fromWhite) rotateCamera(Math.PI);
+  }
+
+  /* ---------- buttons ---------- */
+  function armed(btn, action) {
+    var orig = btn.textContent, t = null;
+    function reset() { clearTimeout(t); btn.classList.remove('warn'); btn.textContent = orig; btn.dataset.armed = ''; }
+    btn.addEventListener('click', function () {
+      if (btn.dataset.armed) { reset(); action(); }
+      else { btn.dataset.armed = '1'; btn.classList.add('warn'); btn.textContent = 'تأكيد؟'; t = setTimeout(reset, 3000); }
+    });
+  }
+  $('bUndo').addEventListener('click', function () {
+    if (busy || !history.length) return;
+    var h = history.pop(); state = h.before; keys.pop();
+    lastMove = history.length ? history[history.length - 1].m : null;
+    over = null; overShown = false; selected = null; $('over').hidden = true;
+    syncPieces(); refresh();
+    if (autoFlip) alignCamera();
+  });
+  $('bFlip').addEventListener('click', function () { rotateCamera(Math.PI); });
+  $('bAuto').addEventListener('click', function (e) {
+    autoFlip = !autoFlip; e.currentTarget.setAttribute('aria-pressed', String(autoFlip));
+    if (autoFlip) alignCamera();
+  });
+  $('bSound').addEventListener('click', function (e) {
+    muted = !muted; e.currentTarget.setAttribute('aria-pressed', String(!muted));
+  });
+  armed($('bNew'), newGame);
+  armed($('bResign'), function () {
+    if (over || busy) return;
+    over = { type: 'resign', loser: state.turn, winner: state.turn === 'w' ? 'b' : 'w' };
+    selected = null; renderUI();
+  });
+  armed($('bDraw'), function () {
+    if (over || busy) return;
+    over = { type: 'agreed' }; selected = null; renderUI();
+  });
+  $('overNew').addEventListener('click', newGame);
+  $('overClose').addEventListener('click', function () { $('over').hidden = true; });
+
+  /* ---------- loop ---------- */
+  var clock = new THREE.Clock();
+  function frame() {
+    requestAnimationFrame(frame);
+    var dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    updateTweens(dt);
+    if (selected != null) {
+      var sm = pieces.get(selected);
+      if (sm && !isTweening(sm)) sm.position.y = 0.1 + Math.sin(t * 4) * 0.03;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  newGame();
+  frame();
+})();
+</script>
+
+</body></html>
